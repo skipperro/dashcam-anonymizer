@@ -1,0 +1,267 @@
+version: '3.8'
+
+services:
+  minio:
+    build:
+      context: ./services/minio
+      dockerfile: Dockerfile
+    container_name: dashcam-minio-test
+    hostname: minio
+    ports:
+      - "9000:9000"     # MinIO API
+      - "9001:9001"     # MinIO Console UI
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+      - MINIO_BROWSER_REDIRECT_URL=http://localhost:9001
+    volumes:
+      - minio_data:/data
+      - minio_config:/root/.minio
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  mongodb:
+    image: mongo:7.0
+    container_name: dashcam-mongodb-test
+    hostname: mongodb
+    ports:
+      - "27017:27017"   # MongoDB port
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=dashcam123
+      - MONGO_INITDB_DATABASE=dashcam_db
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  rabbitmq:
+    build: 
+      context: ./services/rabbitmq
+      dockerfile: Dockerfile
+    container_name: dashcam-rabbitmq-test
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI
+      - "15674:15674"   # Web-STOMP
+    environment:
+      - RABBITMQ_DEFAULT_USER=dashcam
+      - RABBITMQ_DEFAULT_PASS=dashcam123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  backend:
+    build:
+      context: ./services/backend
+      dockerfile: Dockerfile
+    container_name: dashcam-backend-test
+    hostname: backend
+    ports:
+      - "8000:8000"     # Backend API
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      - MONGODB_URI=mongodb://admin:dashcam123@mongodb:27017/dashcam_db?authSource=admin
+      - DATABASE_NAME=dashcam_db
+      
+      # RabbitMQ Configuration  
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=dashcam
+      - RABBITMQ_PASSWORD=dashcam123
+      - RABBITMQ_VHOST=/
+      
+      # Storage Configuration
+      - STORAGE_TYPE=minio
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ENDPOINT_PUBLIC=http://localhost:9000
+      - STORAGE_ACCESS_KEY=AKIABACKEND12345678
+      - STORAGE_SECRET_KEY=backend-secret-key-secure-dashcam-2024
+      - STORAGE_BUCKET_RAW=dashcam-raw-videos
+      - STORAGE_BUCKET_PROCESSED=dashcam-processed-videos
+      - STORAGE_BUCKET_TEMP=dashcam-temp-uploads
+      - STORAGE_BUCKET_THUMBNAILS=dashcam-thumbnails
+      - STORAGE_REGION=us-east-1
+      
+      # Application Configuration
+      - LOG_LEVEL=INFO
+      - CONNECTION_HEALTH_CHECK_INTERVAL=30
+      - CONNECTION_RETRY_MAX_ATTEMPTS=10
+      - CONNECTION_RETRY_BASE_DELAY=1.0
+      - CONNECTION_RETRY_MAX_DELAY=60.0
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+
+  worker:
+    build: 
+      context: ./services/worker
+      dockerfile: Dockerfile
+    container_name: dashcam-worker-test
+    ports:
+      - "8081:8080"     # Health check endpoint (changed to avoid frontend conflict)
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    runtime: nvidia       # Required by some hosts; harmless if NVIDIA Container Toolkit uses cgroups v2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      # RabbitMQ Configuration
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=dashcam
+      - RABBITMQ_PASSWORD=dashcam123
+      - RABBITMQ_VHOST=/
+      
+      # Storage Configuration
+      - STORAGE_TYPE=minio
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=AKIAWORKER12345678
+      - STORAGE_SECRET_KEY=worker-secret-key-secure-dashcam-2024
+      - STORAGE_BUCKET_RAW=dashcam-raw-videos
+      - STORAGE_BUCKET_PROCESSED=dashcam-processed-videos
+      - STORAGE_REGION=us-east-1
+      
+      # Worker Configuration
+      - GPU_ENABLED=true
+      - MODEL_CACHE_DIR=/models
+      - LOG_LEVEL=INFO
+      - WORKER_ID=test-worker
+      
+      # Connection resilience settings
+      - CONNECTION_HEALTH_CHECK_INTERVAL=30
+      - CONNECTION_RETRY_MAX_ATTEMPTS=10
+      - CONNECTION_RETRY_BASE_DELAY=1.0
+      - CONNECTION_RETRY_MAX_DELAY=60.0
+    volumes:
+      - worker_models:/models
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    container_name: dashcam-frontend-test
+    hostname: frontend
+    ports:
+      - "3000:80"       # Frontend UI
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    networks:
+      - dashcam-test
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+ 
+
+volumes:
+  minio_data:
+    driver: local
+  minio_config:
+    driver: local
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  worker_models:
+    driver: local
+
+networks:
+  dashcam-test:
+    driver: bridge

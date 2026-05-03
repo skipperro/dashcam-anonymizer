@@ -1,0 +1,27 @@
+# Optimized ByteTrack configuration for dashcam video conversion
+# Prioritizes tracking quality and anonymization completeness over speed
+
+tracker_type: bytetrack
+
+# Core tracking thresholds - optimized for video conversion (not real-time)
+track_high_thresh: 0.3        # Higher for reliable initial tracking
+track_low_thresh: 0.05        # Very low for maximum recovery of lost tracks
+new_track_thresh: 0.5         # Balanced to avoid false positives while catching cars
+track_buffer: 20              # Large buffer for video processing (2 seconds at 30fps)
+match_thresh: 0.6             # Stricter matching for better long-term stability
+fuse_score: True              # Keep confidence fusion for better association
+
+# Video processing specific settings
+min_box_area: 100             # Filter small distant objects (focus on closer cars)
+max_time_lost: 60             # Keep lost tracks longer for video processing
+frame_rate: 30                # Typical dashcam frame rate
+
+# Enhanced tracking for video conversion
+gmc_method: sparseOptFlow     # Use optical flow for camera motion compensation
+proximity_thresh: 0.6         # Spatial proximity for ReID matching
+appearance_thresh: 0.2        # Lower appearance threshold (cars are similar)
+with_reid: True              # Enable ReID for better tracking
+
+# Advanced parameters for better car tracking
+mot20: False                  # Use MOT17 settings (better for cars)
+cmc_method: sparseOptFlow     # Camera motion compensation method

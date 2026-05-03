@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dashcam-backend"
+version = "1.0.0"
+description = "Dashcam Anonymizer Backend Service"
+authors = [{name = "Dashcam Team"}]
+requires-python = ">=3.12"
+dependencies = [
+    "pika>=1.3.2",
+    "motor>=3.3.2", 
+    "pydantic>=2.5.0",
+    "boto3>=1.34.0",
+    "structlog>=23.2.0",
+    "aiofiles>=23.2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "pytest-timeout>=2.2.0",
+    "pytest-cov>=4.1.0",
+]
+
+[project.scripts]
+dashcam-backend = "dashcam_backend.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+timeout = 1
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "integration: marks tests as integration tests",
+]

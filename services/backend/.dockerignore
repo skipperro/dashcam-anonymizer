@@ -1,0 +1,40 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+docs/
+*.md
+
+# Logs
+logs/
+*.log
+
+# Development
+.env
+.env.local
+.env.test
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

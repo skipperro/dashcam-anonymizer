@@ -1,0 +1,46 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.mypy_cache/
+.ruff_cache/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.xml
+!**/config/*.xml
+
+# Environment files (keep .env.example + .env.test)
+.env
+.env.local
+.env.production
+.env.staging
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Node / Next.js
+node_modules/
+services/frontend/.next/
+services/frontend/out/
+services/frontend/tsconfig.tsbuildinfo
+
+# Generated / temporary files
+repomix-output.xml
+/test-videos/
+
+# macOS
+.DS_Store
+
+/services/worker/models/*
