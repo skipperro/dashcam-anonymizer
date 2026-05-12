@@ -38,9 +38,6 @@ services/frontend/tsconfig.tsbuildinfo
 
 # Generated / temporary files
 repomix-output.xml
-/test-videos/
 
 # macOS
 .DS_Store
-
-/services/worker/models/*

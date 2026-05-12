@@ -506,8 +506,11 @@ class WorkerHealthMonitor:
 
             settings = ProcessingSettings(
                 yolo_classes=[0, 2, 3, 5, 7],
-                model_size="medium",
-                detection_type="bbox"
+                model_size="small",
+                detection_type="bbox",
+                frame_sampling=4,
+                blur_intensity=25,
+                processing_resolution=0.5
             )
 
             task_message = TaskMessage(

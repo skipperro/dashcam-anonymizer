@@ -8,6 +8,7 @@ Handles frame encoding with audio preservation and source-preserving encoding pa
 import threading
 import time
 import os
+import subprocess
 from typing import Dict, Any, Optional
 from queue import Queue, Empty
 import structlog
@@ -90,8 +91,17 @@ class EncoderThread:
                 **encoding_params
             )
             
-            # Start FFmpeg process
-            process = stream.overwrite_output().run_async(pipe_stdin=True, quiet=True)
+            # Start FFmpeg process.
+            # IMPORTANT: Do NOT use quiet=True with run_async — it pipes stdout+stderr
+            # but nobody reads them, causing FFmpeg to deadlock when pipe buffers fill.
+            # Instead use subprocess.DEVNULL to silence FFmpeg output safely.
+            ffmpeg_args = stream.overwrite_output().compile()
+            process = subprocess.Popen(
+                ffmpeg_args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
             
             frame_count = 0
             last_checkpoint = time.time()
@@ -160,8 +170,20 @@ class EncoderThread:
             # Close stdin to signal end of input
             process.stdin.close()
             
-            # Wait for FFmpeg to finish video encoding
-            return_code = process.wait()
+            # Wait for FFmpeg to finish video encoding (2-hour max safety timeout)
+            try:
+                return_code = process.wait(timeout=7200)
+            except subprocess.TimeoutExpired:
+                self.logger.error("FFmpeg encoding timed out after 2 hours, killing process")
+                process.kill()
+                process.wait()
+                stop_event.set()
+                return {
+                    'processed_frames': 0,
+                    'encoder_time': 0.0,
+                    'total_frame_encode_time': 0.0,
+                    'error': 'FFmpeg encoding timed out'
+                }
             if return_code != 0:
                 self.logger.error("FFmpeg video encoding failed", return_code=return_code)
                 stop_event.set()

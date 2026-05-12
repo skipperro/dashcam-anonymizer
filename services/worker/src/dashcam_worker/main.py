@@ -137,16 +137,16 @@ class DashcamWorker:
                 local_mode=True
             )
             
-            # Create task message for local processing
+            # Create task message for local video processing
             from .models import ProcessingSettings
             processing_settings = ProcessingSettings(
                 yolo_classes=settings.get('yolo_classes', [0, 2, 3, 5, 7]),
-                model_size=settings.get('model_size', 'medium'),
-                detection_type=settings.get('detection_type', 'bbox'),
+                model_size=settings.get('model_size', 'small'),
+                detection_type=settings.get('detection_type', 'segmentation'),
                 debug_mode=settings.get('debug_mode', False),
                 blur_intensity=settings.get('blur_intensity', 15),
-                frame_sampling=settings.get('frame_sampling', 1),
-                processing_resolution=settings.get('processing_resolution', 1.0),
+                frame_sampling=settings.get('frame_sampling', 2),
+                processing_resolution=settings.get('processing_resolution', 0.5),
                 enable_hood_detection=settings.get('enable_hood_detection', False),
                 blur_minimum_track_duration=settings.get('blur_minimum_track_duration', 4),
                 blur_large_object_threshold=settings.get('blur_large_object_threshold', 0.15),
